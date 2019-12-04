@@ -10,7 +10,7 @@ struct Opt {
     UPSTREAM: String,
 
     #[structopt(short = "l", long = "listen", default_value = "udp://127.0.0.1:53")]
-    LISTEN_ADDR: String,
+    LISTEN: String,
 
 }
 

@@ -73,14 +73,28 @@ pub fn run(LISTEN: &str, UPSTREAM: &str) -> std::io::Result<()> {
         Ok(())
 }
 
-pub fn check_OPT_record(packet: &[u8], len: usize) -> bool {
-    true
+pub fn check_OPT_record(packet: &[u8], _len: usize) -> bool {
+    let additional_RRs = ((packet[10] as u16) << 8) + packet[11] as u16;
+    if additional_RRs == 0 {
+        false
+    }
+    else {
+        // we shall strictly check the OPT record, but it works for now.
+        true
+    }
 }
 
 pub fn append_OPT_record(packet: &mut [u8], len: usize) -> Result<usize, Box<dyn Error>> {
-    Ok(0)
-}
+    if check_OPT_record(&packet, len) {     // skip if there is an OPT record already
+        return Ok(len)
+    }
 
-pub fn strip_OPT_record(packet: &mut [u8], len: usize) -> Result<usize, Box<dyn Error>> {
-    Ok(0)
+    packet[11] += 1;            // additional_RRs ++
+
+    // additional records header
+    packet[len..len+11].copy_from_slice(&[0x00,0x00,0x29,0x10,0x00,0x00,0x00,0x00,0x00, 0x00,0x0c]);
+    // 12 (0x0c) bytes of record = OPTION Code: 0x000a (cookie) + OPTION len: 0x0008
+    // 8 bytes of COOKIE should be random, does not matter for now.
+    packet[len+11..len+11+12].copy_from_slice(&[0x00,0x0a,0x00,0x08, 1,2,3,4,5,6,7,8]);
+    Ok(len+11+12)
 }

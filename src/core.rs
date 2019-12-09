@@ -6,10 +6,6 @@ use std::error::Error;
 use std::collections::HashMap;
 use std::net::{SocketAddr, UdpSocket};
 
-struct TT_DNS_STATE {
-    client_addr : SocketAddr,
-}
-
 pub fn run(LISTEN: &str, UPSTREAM: &str) -> std::io::Result<()> {
 //        let LISTEN = LISTEN.split("//").collect::<Vec<&str>>()[1];
 //        let UPSTREAM = UPSTREAM.split("//").collect::<Vec<&str>>()[1];
@@ -19,31 +15,31 @@ pub fn run(LISTEN: &str, UPSTREAM: &str) -> std::io::Result<()> {
             process::exit(-1);
         });
         let socket_upstream = UdpSocket::bind("0.0.0.0:0")?;
-        socket_upstream.connect(UPSTREAM).unwrap_or_else(|err|{
-            eprintln!("Error connecting to: [{}], {}", UPSTREAM, err);
-            process::exit(-1);
-        });
+        //socket_upstream.connect(UPSTREAM)?;
 
-        let map: HashMap<u16, TT_DNS_STATE> = HashMap::with_capacity(65536);
+        let map: HashMap<u16, SocketAddr> = HashMap::with_capacity(65536);
         let map = Arc::new(Mutex::new(map));
 
         let _map = map.clone();
         let _socket_listen = socket_listen.try_clone().unwrap();
         let _socket_upstream = socket_upstream.try_clone().unwrap();
+        let _UPSTREAM = UPSTREAM.to_owned();
         let upstream = thread::spawn(move || {
             let mut buf = [0u8; 2048];
             loop {
                 let (len, addr) = _socket_listen.recv_from(&mut buf).unwrap();
                 let trans_id = ((buf[0] as u16) << 8) + buf[1] as u16;
-                let tt_dns = TT_DNS_STATE { client_addr: addr};
                 //if map.contains_key(&trans_id) {
                     // do something
                 //}
                 //else {
-                    _map.lock().unwrap().insert(trans_id, tt_dns);
+                    _map.lock().unwrap().insert(trans_id, addr);
                 //}
                 let new_len = append_OPT_record(&mut buf, len).unwrap();
-                _socket_upstream.send(&buf[..new_len]).unwrap();
+                _socket_upstream.send_to(&buf[..new_len], &_UPSTREAM).unwrap_or_else(|err|{
+                    eprintln!("Error sending to upstream: {}", err);
+                    0
+                });
             }
         });
 
@@ -56,9 +52,12 @@ pub fn run(LISTEN: &str, UPSTREAM: &str) -> std::io::Result<()> {
                 let len = _socket_upstream.recv(&mut buf).unwrap();
                 let trans_id = ((buf[0] as u16) << 8) + buf[1] as u16;
                 if check_OPT_record(&buf, len) {
-                    if let Some(tt_dns) = _map.lock().unwrap().get(&trans_id) {
+                    if let Some(addr) = _map.lock().unwrap().get(&trans_id) {
                         //let new_len = strip_OPT_record(&mut buf, len).unwrap();
-                        _socket_listen.send_to(&buf[..len], tt_dns.client_addr).unwrap();
+                        _socket_listen.send_to(&buf[..len], addr).unwrap_or_else(|err|{
+                            eprintln!("Error sending to client: {}", err);
+                            0
+                        });
                     }
                 }
             }

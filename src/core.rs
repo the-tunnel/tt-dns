@@ -2,6 +2,7 @@
 #![allow(non_camel_case_types)]
 
 use std::thread;
+use std::process;
 use std::sync::{Arc, Mutex};
 use std::error::Error;
 use std::collections::HashMap;
@@ -21,7 +22,10 @@ pub fn run(LISTEN: &str, UPSTREAM: &str) -> std::io::Result<()> {
 //        let LISTEN = LISTEN.split("//").collect::<Vec<&str>>()[1];
 //        let UPSTREAM = UPSTREAM.split("//").collect::<Vec<&str>>()[1];
 
-        let socket_listen = UdpSocket::bind(LISTEN)?;
+        let socket_listen = UdpSocket::bind(LISTEN).unwrap_or_else(|err|{
+            eprintln!("Error binding: [{}], {}", LISTEN, err);
+            process::exit(-1);
+        });
         let socket_upstream = UdpSocket::bind("0.0.0.0:0")?;
         socket_upstream.connect(UPSTREAM)?;
 

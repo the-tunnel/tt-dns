@@ -6,7 +6,7 @@ use std::error::Error;
 use std::collections::HashMap;
 use std::net::{SocketAddr, UdpSocket};
 
-pub fn run(LISTEN: &str, UPSTREAM: &str) -> std::io::Result<()> {
+pub fn run(LISTEN: &str, UPSTREAM: &str, SUBNET: &'static str) -> std::io::Result<()> {
 //        let LISTEN = LISTEN.split("//").collect::<Vec<&str>>()[1];
 //        let UPSTREAM = UPSTREAM.split("//").collect::<Vec<&str>>()[1];
 
@@ -35,7 +35,7 @@ pub fn run(LISTEN: &str, UPSTREAM: &str) -> std::io::Result<()> {
                 //else {
                     _map.lock().unwrap().insert(trans_id, addr);
                 //}
-                let new_len = append_OPT_record(&mut buf, len).unwrap();
+                let new_len = append_OPT_record(&mut buf, SUBNET, len).unwrap();
                 _socket_upstream.send_to(&buf[..new_len], &_UPSTREAM).unwrap_or_else(|err|{
                     eprintln!("Error sending to upstream: {}", err);
                     0
@@ -77,19 +77,37 @@ pub fn check_OPT_record(packet: &[u8], _len: usize) -> bool {
     true
 }
 
-pub fn append_OPT_record(packet: &mut [u8], len: usize) -> Result<usize, Box<dyn Error>> {
+pub fn append_OPT_record(packet: &mut [u8], subnet: &str, len: usize) -> Result<usize, Box<dyn Error>> {
     if check_OPT_record(&packet, len) {     // skip if there is an OPT record already
         return Ok(len)
     }
 
     packet[11] += 1;            // additional_RRs ++
-    // 12 (0x0c) bytes of record = OPTION Code: 0x000a (cookie) + OPTION len: 0x0008
-    // 8 bytes of COOKIE should be random
-    packet[len..len+15].copy_from_slice(&[0x00,0x00,0x29,0x10,0x00,0x00,0x00,0x00,0x00,0x00,0x0c, 0x00,0x0a,0x00,0x08]);
-    let mut count = 0;
-    while count < 8 {
-        packet[len+11+4+count] = rand::random::<u8>();
-        count += 1;
+
+    if subnet == "0.0.0.0" {
+        // 12 (0x0c) bytes of record = OPTION Code: 0x000a (cookie) + OPTION len: 0x0008 + COOKIE (8B)
+        packet[len..len+15].copy_from_slice(&[0x00,0x00,0x29,0x10,0x00,0x00,0x00,0x00,0x00,0x00,0x0c, 0x00,0x0a,0x00,0x08]);
+        let mut count = 0;
+        while count < 8 {
+            packet[len+15+count] = rand::random::<u8>();
+            count += 1;
+        }
+        Ok(len+11+4+8)
     }
-    Ok(len+11+4+8)
+    else{
+
+        let octets: Vec<u8> = subnet
+            .split('.')
+            .map(|segment| segment.parse::<u8>().unwrap())
+            .collect();
+
+        // 23 (0x17) bytes of record = OPTION Code: 0x0x0008(subnet), + OPTION len: 0x0007;  OPTION Code: 0x000a (cookie) + OPTION len: 0x0008 + COOKIE (8B)
+        packet[len..len+26].copy_from_slice(&[0x00,0x00,0x29,0x10,0x00,0x00,0x00,0x00,0x00,0x00,0x17, 0x00,0x08,0x00,0x07, 0x00,0x01,0x18,0x00,octets[0],octets[1],octets[2], 0x00,0x0a,0x00,0x08]);
+        let mut count = 0;
+        while count < 8 {
+            packet[len+26+count] = rand::random::<u8>();
+            count += 1;
+        }
+        Ok(len+11+4+7+4+8)
+    }
 }

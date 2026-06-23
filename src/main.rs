@@ -16,9 +16,13 @@ struct Opt {
     #[structopt(short = "l", long = "listen", default_value = "127.0.0.1:53")]
     LISTEN: String,
 
+    #[structopt(short = "s", long = "subnet", default_value = "0.0.0.0")]
+    SUBNET: String,
+
 }
 
 fn main() {
     let opt = Opt::from_args();
-    core::run(&opt.LISTEN, &opt.UPSTREAM).unwrap();
+    let subnet = Box::leak(opt.SUBNET.into_boxed_str());
+    core::run(&opt.LISTEN, &opt.UPSTREAM, subnet).unwrap();
 }

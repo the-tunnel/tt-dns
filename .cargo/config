@@ -24,7 +24,10 @@ rustflags = ["-C", "link-args=-lgcc"]    			# Fix the missing linking args on ca
 #rustflags = ["-C", "link-args=-lpthread -ldl"]    # Fix the missing linking args on cargo build
 
 [target.arm-linux-androideabi]
-linker = "/path/to/android-ndk/stand_alone_arm/bin/arm-linux-androideabi-gcc"
+linker = "/path/to/android-ndk/android-ndk-r26b/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi26-clang"
+
+[target.aarch64-linux-android]
+linker = "/path/to/android-ndk/android-ndk-r26b/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang"
 
 [target.x86_64-unknown-linux-gnu]
 rustflags = ["-C", "target-cpu=sandybridge", "-C", "target-feature=+aes,+sse2,+sse4.1,+ssse3"]

@@ -82,7 +82,7 @@ pub fn append_OPT_record(packet: &mut [u8], subnet: &str, len: usize) -> Result<
         return Ok(len)
     }
 
-    packet[11] += 1;            // additional_RRs ++
+    packet[11] = 1;            // additional_RRs is 1, OPT can have multiple options
 
     if subnet == "0.0.0.0" {
         // 12 (0x0c) bytes of record = OPTION Code: 0x000a (cookie) + OPTION len: 0x0008 + COOKIE (8B)
